@@ -36,3 +36,32 @@
     transform: rotate(360deg);
   }
 }
+
+.isLoader {
+  background: 
+   /* gradient for the shimmer */ linear-gradient(
+      90deg,
+      #0000 calc(50% - 50px),
+      #fff5 0,
+      #fffb calc(50% + 50px),
+      #0000 0
+    ),
+    /* gradient for the text */ linear-gradient(0deg, grey, grey);
+  /* the sise of the first gradient is bigger than 100% */
+  background-size: calc(200% + 100px) 100%, 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: flare 1s infinite linear;
+  width: fit-content;
+}
+
+/* you animate from right to left */
+@keyframes flare {
+  0% {
+    background-position: right;
+  }
+  30%,
+  100% {
+    background-position: left;
+  }
+}

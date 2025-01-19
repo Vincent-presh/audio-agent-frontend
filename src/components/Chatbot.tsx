@@ -1,5 +1,12 @@
-import React, {useState, useRef} from "react";
+import React, {useState, useEffect, useRef} from "react";
 import {createTask} from "../apis/createTask";
+import {fetchClients} from "../apis/fetchClients";
+import {
+  subscribeToTaskUpdates,
+  connectSocket,
+  disconnectSocket,
+  socketId,
+} from "../services/socketService";
 import {FaPaperclip, FaPaperPlane} from "react-icons/fa";
 
 interface Message {
@@ -7,34 +14,76 @@ interface Message {
   content: string;
 }
 
+interface Client {
+  _id: string;
+  name: string;
+}
+
 const ChatBot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
-  const [clientId] = useState("example-client-id"); // Replace with actual client ID
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClient, setSelectedClient] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    const getClients = async () => {
+      try {
+        const clientData = await fetchClients();
+        setClients(clientData);
+        if (clientData.length > 0) {
+          setSelectedClient(clientData[0]._id);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    getClients();
+  }, []);
+
+  useEffect(() => {
+    connectSocket();
+    return () => {
+      disconnectSocket();
+    };
+  }, []);
+
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !selectedClient) return;
 
     const newMessage: Message = {type: "user", content: input};
     setMessages((prev) => [...prev, newMessage]);
 
     try {
       setLoading(true);
+      console.log(
+        "🚀 ~ file: Chatbot.tsx:64 ~ handleSend ~ socketId:",
+        socketId
+      );
+      // Call the createTask API with selected client
+      const response = await createTask(selectedClient, input, socketId ?? "");
+      const {_id: taskId} = response.data;
 
-      // Call the createTask API
-      const response = await createTask(clientId, input);
+      // Listen for real-time task updates
+      subscribeToTaskUpdates(taskId, (data) => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            type: "bot",
+            content: `Status: ${data.status} | Progress: ${data.progress}%\n${data.message}`,
+          },
+        ]);
+      });
 
-      const {description, chapters} = response.data;
-
-      const botMessage: Message = {
-        type: "bot",
-        content: `Description: ${description}\nChapters: ${chapters.join(
-          ", "
-        )}`,
-      };
-      setMessages((prev) => [...prev, botMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: "bot",
+          content: "Task is being processed, updates will be shown here...",
+        },
+      ]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
@@ -54,8 +103,6 @@ const ChatBot: React.FC = () => {
         content: `Uploaded file: ${file.name}`,
       };
       setMessages((prev) => [...prev, newMessage]);
-
-      // Handle file upload if needed
     }
   };
 
@@ -64,6 +111,29 @@ const ChatBot: React.FC = () => {
       <h2 className="text-2xl font-bold text-center mb-6">
         Video Processing ChatBot
       </h2>
+
+      {/* Client Selection Dropdown */}
+      <div className="mb-4">
+        <label className="block text-gray-700 font-medium mb-2">
+          Select Client
+        </label>
+        <select
+          value={selectedClient}
+          onChange={(e) => setSelectedClient(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg p-2"
+        >
+          {clients.length > 0 ? (
+            clients.map((client) => (
+              <option key={client._id} value={client._id}>
+                {client.name}
+              </option>
+            ))
+          ) : (
+            <option disabled>No clients available</option>
+          )}
+        </select>
+      </div>
+
       <div className="border border-gray-300 rounded-lg p-4 h-96 overflow-y-auto mb-4 bg-gray-50">
         {messages.map((msg, index) => (
           <div
@@ -83,8 +153,8 @@ const ChatBot: React.FC = () => {
             </span>
           </div>
         ))}
-        {loading && <p className="text-center text-gray-500">Processing...</p>}
       </div>
+
       <div className="flex items-center">
         <input
           type="text"
@@ -107,7 +177,7 @@ const ChatBot: React.FC = () => {
         />
         <button
           onClick={handleSend}
-          disabled={loading}
+          disabled={loading || !selectedClient}
           className="bg-blue-500 text-white px-4 py-2 rounded-lg ml-2 hover:bg-blue-600 disabled:bg-blue-300"
         >
           <FaPaperPlane />

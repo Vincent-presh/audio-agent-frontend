@@ -1,11 +1,15 @@
 import axios from "axios";
+import {API_BASE_URL} from "../App";
 
-const API_BASE_URL = "http://localhost:9000/api";
-
-export const createTask = async (clientId: string, videoUrl: string) => {
+export const createTask = async (
+  clientId: string,
+  videoUrl: string,
+  socketId: String
+) => {
   const response = await axios.post(`${API_BASE_URL}/tasks`, {
     clientId,
     videoUrl,
+    socketId,
   });
   return response.data;
 };
