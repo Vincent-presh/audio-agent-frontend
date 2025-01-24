@@ -153,6 +153,9 @@ const ChatBot: React.FC = () => {
             </span>
           </div>
         ))}
+        {loading && (
+          <p className="text-center text-gray-500 isLoader">Processing...</p>
+        )}
       </div>
 
       <div className="flex items-center">
